@@ -1,0 +1,22 @@
+{
+  "name": "hype5-server",
+  "version": "1.0.0",
+  "description": "Hype5 Realtime Engine",
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@colyseus/ws-transport": "^0.15.3",
+    "colyseus": "^0.15.57",
+    "colyseus.js": "^0.16.22",
+    "cors": "^2.8.6",
+    "express": "^4.22.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

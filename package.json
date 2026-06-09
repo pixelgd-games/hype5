@@ -4,7 +4,8 @@
   "description": "Hype5 Realtime Engine",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx index.js"
+    "dev": "tsx index.js",
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",

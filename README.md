@@ -95,8 +95,16 @@ Current local MVP files:
 
 ```text
 hype5-server/
-  index.js
-  room-config.js
+  index.js                    # server bootstrap
+  room-config.js              # backward-compatible config export
+  src/
+    config/room-config.js
+    rooms/Hype5Room.js
+    routes/health-routes.js
+    routes/matchmaking-routes.js
+    routes/room-routes.js
+    services/join-code-store.js
+    utils/normalizers.js
   test_client.js
   load-test.js
   package.json
@@ -117,10 +125,28 @@ Start the server:
 npm run dev
 ```
 
+Start the server in production mode:
+
+```bash
+npm start
+```
+
 Default local endpoints:
 
 - HTTP: `http://localhost:2567`
 - WebSocket: `ws://localhost:2567`
+
+Supported environment variables:
+
+- `PORT`
+- `HOST`
+- `WS_URL`
+- `ROOM_CLEANUP_DELAY_MS`
+- `MOVE_RATE_LIMIT_MS`
+- `MIN_CLIENTS_PER_ROOM`
+- `MAX_CLIENTS_PER_ROOM`
+- `DEFAULT_GAME_ID`
+- `DEFAULT_ROOM_TYPE`
 
 ## 8. Test Commands
 
@@ -187,7 +213,7 @@ Other completed basics:
 - Lightweight automatic matchmaking via `POST /matchmaking/join`
 - Room matching by `game_id` and `room_type`
 - Per-room `max_clients` support, clamped by server config
-- Room configuration is extracted to `room-config.js`
+- Server structure is split into config, room, route, service, and utility modules
 
 Local two-client testing:
 

@@ -52,6 +52,12 @@ The most reasonable next step is not direct production launch. The recommended s
   - `POST /rooms/create`
   - `POST /matchmaking/join`
   - `GET /rooms/resolve/:code`
+- Modular server structure
+  - Config
+  - Room class
+  - Routes
+  - Join-code service
+  - Normalizers
 - Local test client
 - Local lightweight load test
 
@@ -65,11 +71,14 @@ This means Hype5 can already act as a multiplayer synchronization layer for earl
 
 The project is still shaped mainly as a local development version. It has not yet been fully prepared for deployment.
 
-Known gaps:
+Current status:
 
-- `HOST` and `PORT` are still local-development oriented
-- `ws_url` is not generated with a real cloud environment in mind
-- `package.json` currently only has a `dev` script and does not include a production `start` script
+- `PORT`, `HOST`, and `WS_URL` can now be configured through environment variables
+- `package.json` now includes a production `start` script
+- The server is now split into smaller modules
+
+Remaining gaps:
+
 - No `Dockerfile` is currently present
 - No `render.yaml` or equivalent deployment descriptor is currently present
 
@@ -123,9 +132,9 @@ Recommended additional tests:
 
 ### P0: Make Render Staging Work Correctly
 
-- [ ] Use environment variables for `PORT`
-- [ ] Clean up `HOST` and WebSocket URL generation so they are not hardcoded to `localhost`
-- [ ] Add a production startup script such as `start`
+- [x] Use environment variables for `PORT`
+- [x] Clean up `HOST` and WebSocket URL generation so they are not hardcoded to `localhost`
+- [x] Add a production startup script such as `start`
 - [ ] Add Render-compatible deployment settings
 - [ ] Verify WebSocket behavior on Render Singapore
 

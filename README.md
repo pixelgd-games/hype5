@@ -1,293 +1,337 @@
 # Hype5
 
-Hype5 是一個 **realtime room synchronization engine**。
-定位是給小型多人房間制遊戲使用，負責房間生命週期、玩家連線、狀態同步、事件廣播與房間清理。
+Hype5 is a **realtime room synchronization engine**.
 
-## 1. 定位
-Hype5 的角色是：
-- 房間建立 / 加入 / 結束
-- 玩家連線管理
-- 房間狀態同步
-- 事件廣播
-- join code / room metadata 管理
-- snapshot / reconnect 基礎能力
+It is designed for small room-based multiplayer games. Its job is to handle room lifecycle, player connections, state synchronization, event broadcasting, join-code management, and room cleanup.
 
-Hype5 不是：
-- 遊戲邏輯伺服器
-- RNG / 機率裁決引擎
-- 經濟結算引擎
-- MMO 世界伺服器
+## 1. Purpose
 
-## 2. 責任邊界
-### Hype5 負責
-- room lifecycle
-- player connections
-- room state sync
-- event broadcast
-- join validation
-- room cleanup
-- snapshot / reconnect（基礎版）
+Hype5 is responsible for:
 
-### Hype5 不負責
-- game logic
-- RNG / probability
-- economic settlement
-- persistent world simulation
-- heavy physics
+- Creating, joining, and ending rooms
+- Lightweight automatic matchmaking for waiting rooms
+- Managing player connections
+- Synchronizing room and player state
+- Broadcasting in-room events
+- Managing join codes and room metadata
+- Providing a basic foundation for snapshots and reconnect flows
+
+Hype5 is not:
+
+- A game logic server
+- An RNG or probability adjudication engine
+- An economy settlement engine
+- An MMO world server
+
+## 2. Responsibility Boundary
+
+### Hype5 Handles
+
+- Room lifecycle
+- Basic matchmaking
+- Player connections
+- Room state sync
+- Event broadcast
+- Join validation
+- Room cleanup
+- Basic snapshot and reconnect support
+
+### Hype5 Does Not Handle
+
+- Game rules
+- RNG or probability
+- Economy settlement
+- Persistent world simulation
+- Heavy physics
 - MMO world management
 
-## 3. 架構位置
+## 3. Architecture Position
+
 ```text
 Pixel GD / Client
-        │
-        │ WebSocket
-        ▼
+        |
+        | WebSocket
+        v
 Hype5
 Realtime Room Sync Engine
-        │
-        ├─ Aura（一般遊戲邏輯）
-        ├─ FuGhost（博奕機率裁決）
-        └─ Spinnova（經濟 / 帳本）
-4. 適用場景
+        |
+        +-- Aura     (general game logic)
+        +-- FuGhost  (gambling/probability adjudication)
+        +-- Spinnova (economy/ledger)
+```
 
-Hype5 適合：
+## 4. Suitable Use Cases
 
-2D 房間制遊戲
+Hype5 is a good fit for:
 
-小型對戰遊戲
+- 2D room-based games
+- Small multiplayer matches
+- Board games and card games
+- Small RPG party rooms
+- Fish game rooms
+- Live interaction rooms
+- Tipping or interaction event broadcasts
+- Small multiplayer interactions with around 2-10 players per room
 
-棋牌 / 卡牌
+Hype5 is not a good fit for:
 
-小型 RPG 小隊房
+- MMO games
+- Large open worlds
+- Large numbers of players in the same map
+- High-frequency FPS, fighting games, or large MOBA-style competitive sync
+- Large-scale physics simulation
 
-魚機房
+## 5. Current Tech Stack
 
-直播互動房
+- Node.js
+- Express
+- Colyseus
+- WebSocket
+- `@colyseus/ws-transport`
 
-打賞事件 / event broadcast
+## 6. Project Files
 
-2～10 人內的多人互動
+Current local MVP files:
 
-Hype5 不適合：
-
-MMO
-大型開放世界
-大量玩家同圖
-高頻 FPS / 格鬥 / 大型 MOBA 競技同步
-
-大規模物理模擬
-
-5. 目前技術堆疊
-
-Node.js
-
-Express
-
-Colyseus
-
-WebSocket
-
-@colyseus/ws-transport
-
-6. 專案檔案
-
-目前本機 MVP 主要檔案：
-
+```text
 hype5-server/
-├─ index.js
-├─ room-config.js
-├─ test_client.js
-├─ load-test.js
-├─ package.json
-└─ README.md
-7. 本機啟動
-安裝依賴
+  index.js
+  room-config.js
+  test_client.js
+  load-test.js
+  package.json
+  README.md
+```
+
+## 7. Local Setup
+
+Install dependencies:
+
+```bash
 npm install
-啟動 server
+```
+
+Start the server:
+
+```bash
 npm run dev
+```
 
-啟動後預設：
+Default local endpoints:
 
-HTTP: http://localhost:2567
+- HTTP: `http://localhost:2567`
+- WebSocket: `ws://localhost:2567`
 
-WS: ws://localhost:2567
+## 8. Test Commands
 
-8. 測試指令
-本機 client 測試
+Run local test clients:
+
+```bash
 node test_client.js P1
 node test_client.js P2
-本機輕量壓測
+```
+
+Run the local lightweight load test:
+
+```bash
 node load-test.js
-9. 目前已完成功能（本機 MVP）
-已完成
+```
 
-Hype5 server 可正常啟動
+## 9. Completed Features in the Local MVP
 
-Colyseus room 已註冊並可建立 / 連線
+Completed:
 
-test_client 可成功 join room
+- Hype5 server can start locally
+- Colyseus room is registered and can be created/joined
+- `test_client` can join a room successfully
 
-Room Lifecycle 完成
+Room lifecycle:
 
-waiting
+- `waiting`
+- `playing`
+- `ended`
+- `room_start` and `room_end` switch room state
+- `welcome` message returns room lifecycle information
 
-playing
+Basic join validation:
 
-ended
+- Joining is blocked when the room is already playing
+- Joining is blocked when the room has ended
 
-room_start / room_end 可切換房間狀態
+Enhanced join validation:
 
-welcome 訊息可回傳 room lifecycle 資訊
+- `resolve/:code` only accepts rooms in `waiting` state
+- `playing` and `ended` rooms return `not_joinable`
 
-Join Validation 基礎版完成
+Room cleanup:
 
-playing 房禁止加入
+- Room cleanup is delayed after `room_end`
+- Room is automatically disposed after cleanup
+- Join code creation, resolution, and cleanup have been verified
 
-ended 房禁止加入
+Empty-room handling:
 
-Join Validation 強化完成
+- The room automatically ends when all players leave
+- The room is disposed after the cleanup delay
 
-resolve/:code 只接受 waiting
+Player sync and snapshot:
 
-playing / ended 會回 not_joinable
+- Server broadcasts `player_snapshot`
+- New clients immediately receive a snapshot after joining
 
-Room Cleanup 完成
+Other completed basics:
 
-room_end 後延遲 cleanup
+- Movement rate limiting
+- Fake tip / interaction event broadcasting
+- `fake_tip` is broadcast as `fake_tip_event`
+- Lightweight automatic matchmaking via `POST /matchmaking/join`
+- Room matching by `game_id` and `room_type`
+- Per-room `max_clients` support, clamped by server config
+- Room configuration is extracted to `room-config.js`
 
-cleanup 後自動 dispose
+Local two-client testing:
 
-join code create / resolve / cleanup 已驗證
+- Two clients can join the same room
+- Coordinates sync between clients
+- Fake tip events broadcast correctly
 
-空房自動結束完成
+Local lightweight load test:
 
-全員離開後自動 ended
+- 20 clients tested
+- Success: 20
+- Fail: 0
 
-延遲 cleanup 後 disposed
+## 10. Current Local Completion
 
-Player Sync / Snapshot 完成
+The local MVP is approximately **98%-100% complete**.
 
-server 主動廣播 player_snapshot
+It can be considered complete for local MVP validation.
 
-新加入 client 立即收到 snapshot
+## 11. Room End Strategy
 
-Movement Rate Limit 完成
+Room ending should not always be controlled by a fixed timer.
 
-Fake Tip / 互動事件廣播完成
+It should depend on the room type or `end_mode`.
 
-fake_tip -> fake_tip_event
+Recommended `end_mode` values:
 
-Room config 抽離完成
+- `on_empty`
+- `on_timer`
+- `manual`
+- `match_based`
 
-room-config.js
+Meaning:
 
-本機雙 client 測試完成
+- `on_empty`: End the room when all players leave
+- `on_timer`: End the room when time runs out
+- `manual`: End the room manually by host or system command
+- `match_based`: End the room according to game rules
 
-同房
+## 12. Local MVP Conclusion
 
-座標同步
+Hype5 currently supports:
 
-fake tip 廣播
+- Room creation, joining, and ending
+- Lightweight automatic room matching
+- Small-room multiplayer synchronization
+- Join-code resolution and protection
+- In-room event broadcasting
+- Automatic empty-room ending
+- Basic snapshot sync
+- Basic throttling protection
+- Basic local load testing
 
-本機輕量壓測完成
+The local MVP validation can be considered complete.
 
-20 clients
+## 13. Next Stage
 
-success = 20
+Possible next steps:
 
-fail = 0
+- Render deployment
+- Cloud validation
+- Supabase room metadata integration
+- Stronger snapshot and reconnect support
+- Room structure modularization
+- Discord or monitoring integration
 
-10. 目前本機完成度
+## 14. Current API
 
-約 98%～100%
-可視為：
-Hype5 本機 MVP 完成
+Health:
 
-11. 房間結束策略規格結論
-
-房間結束策略不應一律固定 timer。
-應依房型 / end_mode 決定。
-
-建議 end_mode
-
-on_empty
-
-on_timer
-
-manual
-
-match_based
-
-說明
-
-on_empty：玩家都離開就結束
-
-on_timer：時間到就結束
-
-manual：由 host / 系統手動結束
-
-match_based：依遊戲規則判定結束
-
-12. 本機 MVP 收尾結論
-
-目前 Hype5 已具備：
-
-房間建立 / 加入 / 結束
-
-小房間多人同步
-
-join code 解析與保護
-
-房內事件廣播
-
-空房自動結束
-
-基礎 snapshot 同步
-
-基礎節流保護
-
-基礎本機壓測能力
-
-所以本機階段可視為已完成 MVP 驗證。
-
-13. 下一階段
-
-下一階段可往下列方向擇一：
-
-Render 部署
-
-雲端驗證
-
-Supabase rooms metadata 整合
-
-snapshot / reconnect 強化
-
-room 結構再模組化
-
-Discord / monitoring 接入
-
-14. API（目前）
-Health
+```http
 GET /health
-Status
+```
+
+Status:
+
+```http
 GET /status
-Create Room
+```
+
+Create room:
+
+```http
 POST /rooms/create
-Resolve Join Code
+```
+
+Resolve join code:
+
+```http
 GET /rooms/resolve/:code
-15. 開發原則
+```
 
-Hype5 只做同步，不放遊戲邏輯
+Auto-match into a waiting room:
 
-房間制優先，不做 MMO 化
+```http
+POST /matchmaking/join
+```
 
-先做可跑 MVP，再逐步補強
+Example request:
 
-每房控制在小人數（建議 10 人內）
+```json
+{
+  "name": "PlayerOne",
+  "game_id": "fish_game",
+  "room_type": "casual",
+  "max_clients": 4
+}
+```
 
-盡量保持模組化，避免 room 類別過肥
+Example response:
 
-16. 備註
+```json
+{
+  "status": "ok",
+  "match_status": "reserved",
+  "join_code": "ABCD",
+  "room_id": "roomId",
+  "game_id": "fish_game",
+  "room_type": "casual",
+  "max_clients": 4,
+  "ws_url": "ws://localhost:2567",
+  "reservation": {
+    "sessionId": "sessionId",
+    "room": {}
+  }
+}
+```
 
-目前為本機 MVP 收尾版。
-雲端部署、Supabase metadata、監控、進一步 reconnect / snapshot 強化，放在下一階段。
+Clients should consume the returned `reservation` with Colyseus:
+
+```js
+const room = await client.consumeSeatReservation(result.reservation);
+```
+
+## 15. Development Principles
+
+- Hype5 only handles synchronization. It should not contain game logic.
+- Room-based games come first. Do not turn this into an MMO server.
+- Build a runnable MVP first, then harden it step by step.
+- Keep each room small, preferably around 10 players or fewer.
+- Keep the design modular and avoid letting the room class become too large.
+
+## 16. Notes
+
+This is the local MVP wrap-up version.
+
+Cloud deployment, Supabase metadata, monitoring, and stronger reconnect/snapshot behavior belong to the next stage.

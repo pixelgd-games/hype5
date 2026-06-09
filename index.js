@@ -16,12 +16,53 @@ const PORT = ROOM_CONFIG.PORT;
 const HOST = ROOM_CONFIG.HOST;
 const WS_URL = `ws://${HOST}:${PORT}`;
 
+function normalizeLabel(value, fallback) {
+  if (typeof value !== "string") return fallback;
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .slice(0, 40);
+
+  return normalized || fallback;
+}
+
+function normalizePlayerName(value) {
+  if (typeof value !== "string") return "Guest";
+
+  const normalized = value.trim().slice(0, 20);
+  return normalized || "Guest";
+}
+
+function normalizeMaxClients(value) {
+  const n = Number(value ?? ROOM_CONFIG.MAX_CLIENTS_PER_ROOM);
+
+  if (!Number.isFinite(n)) {
+    return ROOM_CONFIG.MAX_CLIENTS_PER_ROOM;
+  }
+
+  return Math.max(
+    ROOM_CONFIG.MIN_CLIENTS_PER_ROOM,
+    Math.min(ROOM_CONFIG.MAX_CLIENTS_PER_ROOM, Math.floor(n))
+  );
+}
+
+function normalizeRoomOptions(data = {}) {
+  return {
+    game_id: normalizeLabel(data.game_id, ROOM_CONFIG.DEFAULT_GAME_ID),
+    room_type: normalizeLabel(data.room_type, ROOM_CONFIG.DEFAULT_ROOM_TYPE),
+    max_clients: normalizeMaxClients(data.max_clients)
+  };
+}
+
 /*
 ------------------------------------------------
 Join Code Mapping
 ------------------------------------------------
 */
 const joinCodeMap = new Map();
+const roomJoinCodeMap = new Map();
 
 function randomJoinCode4() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -40,14 +81,27 @@ function allocateJoinCodeUnique() {
   return code;
 }
 
+function assignJoinCodeToRoom(roomId) {
+  const existing = roomJoinCodeMap.get(roomId);
+  if (existing) return existing;
+
+  const code = allocateJoinCodeUnique();
+  joinCodeMap.set(code, roomId);
+  roomJoinCodeMap.set(roomId, code);
+  return code;
+}
+
+function getJoinCodeByRoomId(roomId) {
+  return roomJoinCodeMap.get(roomId) || null;
+}
+
 function removeJoinCodeByRoomId(roomId) {
-  for (const [code, mappedRoomId] of joinCodeMap.entries()) {
-    if (mappedRoomId === roomId) {
-      joinCodeMap.delete(code);
-      return code;
-    }
-  }
-  return null;
+  const code = roomJoinCodeMap.get(roomId);
+  if (!code) return null;
+
+  roomJoinCodeMap.delete(roomId);
+  joinCodeMap.delete(code);
+  return code;
 }
 
 /*
@@ -59,7 +113,7 @@ Hype5 Room
 class Hype5Room extends Room {
   maxClients = ROOM_CONFIG.MAX_CLIENTS_PER_ROOM;
 
-  onCreate() {
+  onCreate(options = {}) {
     console.log("room created:", this.roomId);
 
     this.players = {};
@@ -71,13 +125,22 @@ class Hype5Room extends Room {
     this.started_at = null;
     this.ended_at = null;
 
+    this.game_id = normalizeLabel(options.game_id, ROOM_CONFIG.DEFAULT_GAME_ID);
+    this.room_type = normalizeLabel(options.room_type, ROOM_CONFIG.DEFAULT_ROOM_TYPE);
+    this.maxClients = normalizeMaxClients(options.max_clients);
+    this.join_code = assignJoinCodeToRoom(this.roomId);
+
     this.autoDispose = false;
+    this.updateRoomMetadata();
 
     this.onMessage("room_start", () => {
       if (this.room_state !== "waiting") return;
 
       this.room_state = "playing";
       this.started_at = Date.now();
+      this.lock().catch((err) => {
+        console.error("room lock failed:", this.roomId, err.message || err);
+      });
 
       this.broadcastRoomLifecycle();
       console.log("room started:", this.roomId);
@@ -186,10 +249,7 @@ class Hype5Room extends Room {
   }
 
   onJoin(client, options) {
-    const name =
-      typeof options?.name === "string"
-        ? options.name.slice(0, 20)
-        : "Guest";
+    const name = normalizePlayerName(options?.name);
 
     this.players[client.sessionId] = {
       session_id: client.sessionId,
@@ -203,6 +263,9 @@ class Hype5Room extends Room {
 
     client.send("welcome", {
       roomId: this.roomId,
+      join_code: this.join_code,
+      game_id: this.game_id,
+      room_type: this.room_type,
       name,
       room_state: this.room_state,
       created_at: this.created_at,
@@ -237,6 +300,9 @@ class Hype5Room extends Room {
 
     return {
       room_id: this.roomId,
+      join_code: this.join_code,
+      game_id: this.game_id,
+      room_type: this.room_type,
       room_state: this.room_state,
       created_at: this.created_at,
       started_at: this.started_at,
@@ -245,12 +311,30 @@ class Hype5Room extends Room {
     };
   }
 
+  buildRoomMetadata() {
+    return {
+      room_state: this.room_state,
+      join_code: this.join_code,
+      game_id: this.game_id,
+      room_type: this.room_type,
+      max_clients: this.maxClients,
+      created_at: this.created_at,
+      started_at: this.started_at,
+      ended_at: this.ended_at
+    };
+  }
+
+  updateRoomMetadata() {
+    this.setMetadata(this.buildRoomMetadata());
+  }
+
   broadcastRoomLifecycle() {
-    this.setMetadata({
-      room_state: this.room_state
-    });
+    this.updateRoomMetadata();
 
     this.broadcast("room_lifecycle", {
+      join_code: this.join_code,
+      game_id: this.game_id,
+      room_type: this.room_type,
       room_state: this.room_state,
       created_at: this.created_at,
       started_at: this.started_at,
@@ -267,6 +351,9 @@ class Hype5Room extends Room {
 
     this.room_state = "ended";
     this.ended_at = Date.now();
+    this.lock().catch((err) => {
+      console.error("room lock failed:", this.roomId, err.message || err);
+    });
 
     this.broadcastRoomLifecycle();
     console.log("room ended:", this.roomId);
@@ -315,18 +402,59 @@ app.get("/status", (req, res) => {
 });
 
 app.post("/rooms/create", async (req, res) => {
-  const join_code = allocateJoinCodeUnique();
+  const roomOptions = normalizeRoomOptions(req.body);
 
-  const room = await matchMaker.createRoom("hype5_room", {});
+  const room = await matchMaker.createRoom("hype5_room", roomOptions);
+  const join_code = getJoinCodeByRoomId(room.roomId) || assignJoinCodeToRoom(room.roomId);
 
-  joinCodeMap.set(join_code, room.roomId);
+  if (!room.metadata?.join_code) {
+    room.metadata = {
+      ...(room.metadata || {}),
+      join_code
+    };
+  }
 
   res.json({
     status: "ok",
     join_code,
     room_id: room.roomId,
+    game_id: roomOptions.game_id,
+    room_type: roomOptions.room_type,
+    max_clients: roomOptions.max_clients,
     ws_url: WS_URL
   });
+});
+
+app.post("/matchmaking/join", async (req, res) => {
+  const roomOptions = normalizeRoomOptions(req.body);
+  const playerOptions = {
+    ...roomOptions,
+    name: normalizePlayerName(req.body?.name)
+  };
+
+  try {
+    const reservation = await matchMaker.joinOrCreate("hype5_room", playerOptions);
+    const join_code =
+      getJoinCodeByRoomId(reservation.room.roomId) ||
+      assignJoinCodeToRoom(reservation.room.roomId);
+
+    res.json({
+      status: "ok",
+      match_status: "reserved",
+      join_code,
+      room_id: reservation.room.roomId,
+      game_id: roomOptions.game_id,
+      room_type: roomOptions.room_type,
+      max_clients: reservation.room.maxClients,
+      ws_url: WS_URL,
+      reservation
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      message: "MATCHMAKING_FAILED"
+    });
+  }
 });
 
 app.get("/rooms/resolve/:code", async (req, res) => {
@@ -351,6 +479,13 @@ app.get("/rooms/resolve/:code", async (req, res) => {
 
     const target = room[0];
 
+    if (target.locked) {
+      return res.status(409).json({
+        status: "not_joinable",
+        room_state: target.metadata?.room_state || "locked"
+      });
+    }
+
     if (target.metadata?.room_state && target.metadata.room_state !== "waiting") {
       return res.status(409).json({
         status: "not_joinable",
@@ -358,10 +493,21 @@ app.get("/rooms/resolve/:code", async (req, res) => {
       });
     }
 
+    if (target.clients >= target.maxClients) {
+      return res.status(409).json({
+        status: "not_joinable",
+        room_state: target.metadata?.room_state || "waiting",
+        reason: "room_full"
+      });
+    }
+
     res.json({
       status: "ok",
       join_code: code,
       room_id: roomId,
+      game_id: target.metadata?.game_id || ROOM_CONFIG.DEFAULT_GAME_ID,
+      room_type: target.metadata?.room_type || ROOM_CONFIG.DEFAULT_ROOM_TYPE,
+      max_clients: target.maxClients,
       ws_url: WS_URL
     });
   } catch (err) {
@@ -388,16 +534,16 @@ const gameServer = new Server({
 
 gameServer.define("hype5_room", Hype5Room, {
   metadata: {
-    room_state: "waiting"
+    room_state: "waiting",
+    game_id: ROOM_CONFIG.DEFAULT_GAME_ID,
+    room_type: ROOM_CONFIG.DEFAULT_ROOM_TYPE
   }
-});
+}).filterBy(["game_id", "room_type"]);
 
 const originalOnCreate = Hype5Room.prototype.onCreate;
 Hype5Room.prototype.onCreate = function (...args) {
   originalOnCreate.apply(this, args);
-  this.setMetadata({
-    room_state: this.room_state
-  });
+  this.updateRoomMetadata();
 };
 
 appServer.listen(PORT, () => {
